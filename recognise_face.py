@@ -73,4 +73,4 @@ def main(r):
     st = "images/" + r
     labelImage(st)
 
-main("photo1699131917 (1).jpeg")
+main("photo1699131917.jpeg")
