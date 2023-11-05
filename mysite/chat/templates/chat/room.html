@@ -2,12 +2,33 @@
 <head>
     <meta charset="utf-8"/>
     <title>Chat Room</title>
+    <style>
+        #chat-container {
+            width: 100%;
+        }
+        .chat-message {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 5px;
+        }
+        .chat-image {
+            max-width: 100%;
+        }
+    </style>
 </head>
 <body>
+    <div id="chat-container">
     <textarea id="chat-log" cols="100" rows="20"></textarea><br>
-    <input id="chat-message-input" type="text" size="100"><br>
-    <input id="chat-message-submit" type="button" value="Send">
+    <input id="chat-message-input" type="text" size="100">
     
+    <!-- Add an input for image upload -->
+    <input type="file" id="image-input" accept="image/*">
+    
+    <input id="chat-message-submit" type="button" value="Send">
+
+    <!-- Add an onchange event to display the selected image within the chat box -->
+    <img id="selected-image" src="" alt="Selected Image" class="chat-image" style="display: none;">
+
     {{ room_name|json_script:"room-name" }}
     <script>
         const roomName = JSON.parse(document.getElementById('room-name').textContent);
@@ -22,8 +43,28 @@
 
         chatSocket.onmessage = function(e) {
             const data = JSON.parse(e.data);
-            document.querySelector('#chat-log').value += (data.message + '\n');
+            const chatContainer = document.getElementById('chat-container');
+            const chatLog = document.querySelector('#chat-log');
+
+            if (data.message) {
+                // Handle text message
+                chatLog.value += (data.message + '\n');
+            }
+
+            if (data.imageDataUrl) {
+                // Handle image message
+                const chatMessage = document.createElement('div');
+                chatMessage.className = 'chat-message';
+                const imageElement = document.createElement('img');
+                imageElement.src = data.imageDataUrl;
+                imageElement.alt = 'Chat Image';
+                imageElement.className = 'chat-image';
+                chatMessage.appendChild(imageElement);
+                chatContainer.appendChild(chatMessage);
+            }
+        
         };
+
 
         chatSocket.onclose = function(e) {
             console.error('Chat socket closed unexpectedly');
@@ -39,11 +80,56 @@
         document.querySelector('#chat-message-submit').onclick = function(e) {
             const messageInputDom = document.querySelector('#chat-message-input');
             const message = messageInputDom.value;
-            chatSocket.send(JSON.stringify({
-                'message': message
-            }));
-            messageInputDom.value = '';
+            const imageInputDom = document.querySelector('#image-input');
+            const selectedImage = imageInputDom.files[0];
+        
+            if (selectedImage) {
+                // If an image is selected, send it through the socket
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imageMessage = {
+                        'message': message,
+                        'imageDataUrl': e.target.result,
+                    };
+                    console.log(imageMessage)
+                    chatSocket.send(JSON.stringify(imageMessage));
+                    messageInputDom.value = '';
+                    imageInputDom.value = ''; // Clear the image input
+                };
+                
+                reader.readAsDataURL(selectedImage);
+            } else {
+                // If no image is selected, send a text message
+                chatSocket.send(JSON.stringify({
+                    'message': message,
+                }));
+                messageInputDom.value = '';
+            }
         };
+
+
+        document.getElementById('image-input').addEventListener('change', function(event) {
+            const selectedImage = document.getElementById('selected-image');
+            const chatContainer = document.getElementById('chat-container');
+            const file = event.target.files[0];
+
+            if (file) {
+                const reader = new FileReader();
+
+                reader.onload = function(e) {
+                    selectedImage.src = e.target.result;
+                    selectedImage.style.display = 'block'; // Show the selected image
+                    chatContainer.appendChild(selectedImage);
+                };
+
+                reader.readAsDataURL(file);
+            } else {
+                // Clear the image display if no file is selected
+                selectedImage.src = '';
+                selectedImage.style.display = 'none';
+            }
+        });
+
     </script>
 </body>
 </html>
